@@ -1,0 +1,371 @@
+const API_BASE = '/api';
+
+// ========== التهيئة ==========
+document.addEventListener('DOMContentLoaded', () => {
+    setupNavigation();
+    loadDashboard();
+    loadDoctors();
+    loadLocations();
+    
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    document.getElementById('schedule-month').value = `${year}-${month}`;
+});
+
+// ========== التنقل ==========
+function setupNavigation() {
+    const navBtns = document.querySelectorAll('.nav-btn, .mobile-nav-btn');
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const view = btn.dataset.view;
+            switchView(view);
+        });
+    });
+    
+    document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+        document.getElementById('mobileMenu').classList.toggle('active');
+    });
+}
+
+function switchView(viewName) {
+    // تحديث الأزرار
+    document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.view === viewName) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // تحديث المحتوى
+    document.querySelectorAll('.view').forEach(view => {
+        view.classList.remove('active');
+    });
+    document.getElementById(`${viewName}-view`).classList.add('active');
+    
+    // إغلاق القائمة الجانبية في الموبايل
+    document.getElementById('mobileMenu').classList.remove('active');
+    
+    // تحميل البيانات حسب الصفحة
+    if (viewName === 'dashboard') loadDashboard();
+    if (viewName === 'doctors') loadDoctors();
+    if (viewName === 'schedule') loadSchedule();
+    if (viewName === 'stats') loadStatsReport();
+}
+
+// ========== Dashboard ==========
+async function loadDashboard() {
+    try {
+        const response = await fetch(`${API_BASE}/stats`);
+        const stats = await response.json();
+        
+        document.getElementById('total-doctors').textContent = stats.total_doctors;
+        document.getElementById('total-shifts').textContent = stats.total_shifts;
+        document.getElementById('avg-shifts').textContent = stats.avg_shifts_per_doctor;
+    } catch (error) {
+        showToast('خطأ في تحميل البيانات', 'error');
+    }
+}
+
+// ========== الأطباء ==========
+async function loadDoctors() {
+    try {
+        const response = await fetch(`${API_BASE}/doctors`);
+        const doctors = await response.json();
+        
+        const container = document.getElementById('doctors-grid');
+        
+        if (doctors.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-user-md"></i><p>لا يوجد أطباء. أضف طبيباً جديداً!</p></div>`;
+            return;
+        }
+        
+        container.innerHTML = doctors.map(doctor => `
+            <div class="doctor-card">
+                <h3><i class="fas fa-user-circle"></i> ${doctor.name}</h3>
+                <div class="doctor-info">
+                    <p><span class="info-label"><i class="fas fa-calendar"></i> تاريخ البدء:</span><span class="info-value">${doctor.start_date || 'غير محدد'}</span></p>
+                    <p><span class="info-label"><i class="fas fa-clock"></i> عدد المناوبات:</span><span class="info-value">${doctor.shifts_count || 0}</span></p>
+                    <p><span class="info-label"><i class="fas fa-chart-line"></i> نقاط الصعوبة:</span><span class="info-value">${doctor.difficulty_total || 0}</span></p>
+                    <p><span class="info-label"><i class="fas fa-umbrella-beach"></i> أيام العطل:</span><span class="info-value">${doctor.holidays_count || 0}</span></p>
+                </div>
+                <div class="doctor-actions">
+                    <button class="edit-btn" onclick="editDoctor('${doctor._id}')"><i class="fas fa-edit"></i> تعديل</button>
+                    <button class="delete-btn" onclick="deleteDoctor('${doctor._id}')"><i class="fas fa-trash"></i> حذف</button>
+                </div>
+            </div>
+        `).join('');
+        
+        // تحديث قائمة المناوبات
+        const doctorSelect = document.getElementById('assign-doctor');
+        doctorSelect.innerHTML = '<option value="">اختر الطبيب</option>' + 
+            doctors.map(d => `<option value="${d._id}">${d.name} (${d.shifts_count || 0} مناوبة)</option>`).join('');
+    } catch (error) {
+        showToast('خطأ في تحميل الأطباء', 'error');
+    }
+}
+
+async function addDoctor() {
+    const name = document.getElementById('doctor-name').value;
+    const startDate = document.getElementById('doctor-start-date').value;
+    
+    if (!name) {
+        showToast('الرجاء إدخال اسم الطبيب', 'error');
+        return;
+    }
+    
+    try {
+        await fetch(`${API_BASE}/doctors`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, start_date: startDate })
+        });
+        
+        document.getElementById('doctor-name').value = '';
+        document.getElementById('doctor-start-date').value = '';
+        
+        loadDoctors();
+        loadDashboard();
+        showToast('تم إضافة الطبيب بنجاح', 'success');
+    } catch (error) {
+        showToast('خطأ في إضافة الطبيب', 'error');
+    }
+}
+
+async function deleteDoctor(id) {
+    if (confirm('هل أنت متأكد من حذف هذا الطبيب؟')) {
+        await fetch(`${API_BASE}/doctors/${id}`, { method: 'DELETE' });
+        loadDoctors();
+        loadDashboard();
+        showToast('تم حذف الطبيب', 'success');
+    }
+}
+
+function editDoctor(id) {
+    const newName = prompt('أدخل الاسم الجديد للطبيب:');
+    if (newName) {
+        fetch(`${API_BASE}/doctors/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName })
+        }).then(() => {
+            loadDoctors();
+            loadDashboard();
+            showToast('تم تعديل الاسم', 'success');
+        });
+    }
+}
+
+// ========== الأماكن ==========
+async function loadLocations() {
+    try {
+        const response = await fetch(`${API_BASE}/locations`);
+        const locations = await response.json();
+        
+        const locationSelect = document.getElementById('assign-location');
+        locationSelect.innerHTML = '<option value="">اختر المكان</option>' + 
+            locations.map(l => `<option value="${l._id}">${l.name}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+// ========== جدول المناوبات ==========
+async function loadSchedule() {
+    const monthValue = document.getElementById('schedule-month').value;
+    if (!monthValue) return;
+    
+    const [year, month] = monthValue.split('-');
+    const container = document.getElementById('schedule-container');
+    container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> جاري التحميل...</div>';
+    
+    try {
+        const response = await fetch(`${API_BASE}/shifts/${year}/${month}`);
+        const shifts = await response.json();
+        
+        if (shifts.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-alt"></i><p>لا توجد مناوبات لهذا الشهر</p></div>`;
+            return;
+        }
+        
+        // تجميع حسب التاريخ
+        const grouped = {};
+        shifts.forEach(shift => {
+            if (!grouped[shift.date]) grouped[shift.date] = [];
+            grouped[shift.date].push(shift);
+        });
+        
+        let html = `<table class="schedule-table">
+            <thead>
+                <tr><th>التاريخ</th><th>اليوم</th><th>المكان</th><th>الطبيب</th><th>إجراء</th></tr>
+            </thead>
+            <tbody>`;
+        
+        const weekdays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        
+        for (const [date, dayShifts] of Object.entries(grouped)) {
+            const dayName = weekdays[new Date(date).getDay()];
+            dayShifts.forEach(shift => {
+                html += `
+                    <tr>
+                        <td>${date}</td>
+                        <td>${dayName}</td>
+                        <td>${shift.location_name}</td>
+                        <td>${shift.doctor_name}</td>
+                        <td><button class="swap-btn" onclick="swapShift('${shift._id}')"><i class="fas fa-exchange-alt"></i> تبديل</button></td>
+                    </tr>
+                `;
+            });
+        }
+        
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+    } catch (error) {
+        container.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>خطأ في تحميل الجدول</p></div>`;
+    }
+}
+
+async function assignShift() {
+    const doctor_id = document.getElementById('assign-doctor').value;
+    const location_id = document.getElementById('assign-location').value;
+    const date = document.getElementById('assign-date').value;
+    
+    if (!doctor_id || !location_id || !date) {
+        showToast('الرجاء ملء جميع الحقول', 'error');
+        return;
+    }
+    
+    try {
+        await fetch(`${API_BASE}/shifts/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ doctor_id, location_id, date, shift_type: 'normal' })
+        });
+        
+        document.getElementById('assign-date').value = '';
+        loadSchedule();
+        loadDoctors();
+        loadDashboard();
+        showToast('تم توزيع المناوبة بنجاح', 'success');
+    } catch (error) {
+        showToast('خطأ في توزيع المناوبة', 'error');
+    }
+}
+
+async function swapShift(shiftId) {
+    alert('ميزة التبديل: سيتم إضافتها قريباً');
+}
+
+// ========== التقارير ==========
+async function loadStatsReport() {
+    const container = document.getElementById('stats-report');
+    container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> جاري التحميل...</div>';
+    
+    try {
+        const response = await fetch(`${API_BASE}/stats`);
+        const stats = await response.json();
+        
+        if (stats.doctors.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-chart-bar"></i><p>لا توجد بيانات إحصائية</p></div>`;
+            return;
+        }
+        
+        // ترتيب الأطباء حسب عدد المناوبات
+        const sortedDoctors = [...stats.doctors].sort((a, b) => b.shifts_count - a.shifts_count);
+        const maxShifts = sortedDoctors[0]?.shifts_count || 0;
+        const minShifts = sortedDoctors[sortedDoctors.length - 1]?.shifts_count || 0;
+        
+        container.innerHTML = `
+            <div class="stats-grid" style="margin-bottom: 2rem;">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+                    <div class="stat-info">
+                        <h3>أكثر طبيب مناوبات</h3>
+                        <div class="stat-number">${sortedDoctors[0]?.name || '-'}</div>
+                        <small>${sortedDoctors[0]?.shifts_count || 0} مناوبة</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-seedling"></i></div>
+                    <div class="stat-info">
+                        <h3>أقل طبيب مناوبات</h3>
+                        <div class="stat-number">${sortedDoctors[sortedDoctors.length - 1]?.name || '-'}</div>
+                        <small>${minShifts} مناوبة</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-balance-scale"></i></div>
+                    <div class="stat-info">
+                        <h3>فارق التوزيع</h3>
+                        <div class="stat-number">${maxShifts - minShifts}</div>
+                        <small>بين الأكثر والأقل</small>
+                    </div>
+                </div>
+            </div>
+            
+            <h3 style="margin-bottom: 1rem;"><i class="fas fa-chart-simple"></i> تفاصيل الأطباء</h3>
+            <table class="doctors-table">
+                <thead>
+                    <tr><th>#</th><th>الاسم</th><th>عدد المناوبات</th><th>نقاط الصعوبة</th><th>المعدل</th></tr>
+                </thead>
+                <tbody>
+                    ${sortedDoctors.map((doctor, index) => `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td><strong>${doctor.name}</strong></td>
+                            <td>${doctor.shifts_count}</td>
+                            <td>${doctor.difficulty_total}</td>
+                            <td>${doctor.shifts_count > 0 ? (doctor.difficulty_total / doctor.shifts_count).toFixed(1) : 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        container.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>خطأ في تحميل الإحصائيات</p></div>`;
+    }
+}
+
+// ========== أدوات مساعدة ==========
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast ${type} show`;
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
+}
+
+function exportToExcel() {
+    const table = document.querySelector('.schedule-table');
+    if (!table) {
+        showToast('لا يوجد جدول لتحميله', 'error');
+        return;
+    }
+    
+    let csv = [];
+    const rows = table.querySelectorAll('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const row = [];
+        const cols = rows[i].querySelectorAll('td, th');
+        for (let j = 0; j < cols.length; j++) {
+            row.push('"' + cols[j].innerText.replace(/"/g, '""') + '"');
+        }
+        csv.push(row.join(','));
+    }
+    
+    const blob = new Blob(['\uFEFF' + csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `schedule_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('تم تصدير الجدول بنجاح', 'success');
+}
+
+function exportData() {
+    exportToExcel();
+}

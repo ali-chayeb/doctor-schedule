@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>نظام المناوبات - قسم الباطنة</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <!-- شريط التنقل العلوي -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-hospital-user"></i>
+                <span>نظام المناوبات</span>
+                <small>قسم الباطنة</small>
+            </div>
+            <div class="nav-links">
+                <button class="nav-btn active" data-view="dashboard">
+                    <i class="fas fa-chart-line"></i>
+                    <span>لوحة التحكم</span>
+                </button>
+                <button class="nav-btn" data-view="doctors">
+                    <i class="fas fa-user-md"></i>
+                    <span>الأطباء</span>
+                </button>
+                <button class="nav-btn" data-view="schedule">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>جدول المناوبات</span>
+                </button>
+                <button class="nav-btn" data-view="stats">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>التقارير</span>
+                </button>
+            </div>
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- القائمة الجانبية للموبايل -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-nav-btn" data-view="dashboard">
+            <i class="fas fa-chart-line"></i> لوحة التحكم
+        </button>
+        <button class="mobile-nav-btn" data-view="doctors">
+            <i class="fas fa-user-md"></i> الأطباء
+        </button>
+        <button class="mobile-nav-btn" data-view="schedule">
+            <i class="fas fa-calendar-alt"></i> جدول المناوبات
+        </button>
+        <button class="mobile-nav-btn" data-view="stats">
+            <i class="fas fa-chart-bar"></i> التقارير
+        </button>
+    </div>
+
+    <!-- المحتوى الرئيسي -->
+    <main class="main-content">
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view active">
+            <div class="view-header">
+                <h1><i class="fas fa-chart-line"></i> لوحة التحكم</h1>
+                <p>نظرة عامة على نظام المناوبات</p>
+            </div>
+            
+            <div class="stats-grid" id="dashboard-stats">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-user-md"></i></div>
+                    <div class="stat-info">
+                        <h3>إجمالي الأطباء</h3>
+                        <div class="stat-number" id="total-doctors">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                    <div class="stat-info">
+                        <h3>إجمالي المناوبات</h3>
+                        <div class="stat-number" id="total-shifts">0</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-chart-simple"></i></div>
+                    <div class="stat-info">
+                        <h3>متوسط المناوبات</h3>
+                        <div class="stat-number" id="avg-shifts">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <h3><i class="fas fa-bolt"></i> إجراءات سريعة</h3>
+                <div class="actions-grid">
+                    <button class="action-card" onclick="switchView('doctors')">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>إضافة طبيب جديد</span>
+                    </button>
+                    <button class="action-card" onclick="switchView('schedule')">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>توزيع مناوبة جديدة</span>
+                    </button>
+                    <button class="action-card" onclick="exportData()">
+                        <i class="fas fa-file-excel"></i>
+                        <span>تصدير التقرير</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Doctors View -->
+        <div id="doctors-view" class="view">
+            <div class="view-header">
+                <h1><i class="fas fa-user-md"></i> إدارة الأطباء</h1>
+                <p>إضافة وتعديل وحذف الأطباء</p>
+            </div>
+
+            <div class="add-form-card">
+                <h3><i class="fas fa-plus-circle"></i> إضافة طبيب جديد</h3>
+                <div class="form-group">
+                    <input type="text" id="doctor-name" placeholder="اسم الطبيب الكامل">
+                    <input type="date" id="doctor-start-date">
+                    <button onclick="addDoctor()" class="btn-primary">
+                        <i class="fas fa-save"></i> إضافة
+                    </button>
+                </div>
+            </div>
+
+            <div class="doctors-grid" id="doctors-grid">
+                <!-- سيتم عرض الأطباء هنا -->
+            </div>
+        </div>
+
+        <!-- Schedule View -->
+        <div id="schedule-view" class="view">
+            <div class="view-header">
+                <h1><i class="fas fa-calendar-alt"></i> جدول المناوبات</h1>
+                <p>توزيع وإدارة المناوبات اليومية</p>
+            </div>
+
+            <div class="schedule-controls-card">
+                <div class="control-group">
+                    <label><i class="fas fa-calendar-month"></i> الشهر</label>
+                    <input type="month" id="schedule-month" class="month-picker">
+                </div>
+                <button onclick="loadSchedule()" class="btn-secondary">
+                    <i class="fas fa-search"></i> عرض
+                </button>
+                <button onclick="exportToExcel()" class="btn-success">
+                    <i class="fas fa-download"></i> تحميل
+                </button>
+            </div>
+
+            <div class="assign-card">
+                <h3><i class="fas fa-plus-circle"></i> توزيع مناوبة جديدة</h3>
+                <div class="assign-grid">
+                    <select id="assign-doctor" class="select-modern">
+                        <option value="">اختر الطبيب</option>
+                    </select>
+                    <select id="assign-location" class="select-modern">
+                        <option value="">اختر المكان</option>
+                    </select>
+                    <input type="date" id="assign-date" class="date-input">
+                    <button onclick="assignShift()" class="btn-primary">
+                        <i class="fas fa-check"></i> توزيع
+                    </button>
+                </div>
+            </div>
+
+            <div class="schedule-table-container" id="schedule-container">
+                <!-- سيتم عرض الجدول هنا -->
+            </div>
+        </div>
+
+        <!-- Stats View -->
+        <div id="stats-view" class="view">
+            <div class="view-header">
+                <h1><i class="fas fa-chart-bar"></i> التقارير والإحصائيات</h1>
+                <p>تحليل عادل لتوزيع المناوبات</p>
+            </div>
+
+            <div class="report-card" id="stats-report">
+                <!-- سيتم عرض الإحصائيات هنا -->
+            </div>
+        </div>
+    </main>
+
+    <!-- رسالة تنبيه -->
+    <div id="toast" class="toast"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
